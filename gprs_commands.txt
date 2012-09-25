@@ -1,0 +1,24 @@
+Query for GPRS network
+AT+CGATT?
++CGATT: 1 //means its attached
+
+Setup PDP context
+AT+CGDCONT=1,"IP","epc.tmobile.com" //apn for t-mobile
+
+Activate PDP context
+AT+CGACT=1,1
+
+Configure remote host and port over TCP
+AT+SDATACONF=1,"TCP","www.google.com",80
+
+Start TCP/UDP connection
+AT+SDATASTART=1,1
+
+Query Connecting status
+AT+SDATASTATUS=1
+
+Send String Dagta
+AT+SSTRSEND=1,"GET /search?q=arduino HTTP/1.0"
+
+Read data
+AT+SDATAREAD=1
