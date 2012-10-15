@@ -6,8 +6,7 @@
 SoftwareSerial cell(2,3);
 char incoming_char = 0;
 
-void setup()
-{
+void setup() {
   digitalWrite(13, HIGH);
   Serial.begin(9600); //Serial for debugging messages
   cell.begin(9600); //Set up modem for communication
@@ -23,14 +22,13 @@ void setup()
   
   cell.println("AT+CMGF=1"); // set SMS mode to text
   cell.println("AT+CPMS=\"SM\",\"SM\""); // set message storage to SIM
-  //cell.println("AT+CMGD=1,4"); // delete all SMS's from SIM card
+  cell.println("AT+CMGD=1,4"); // delete all SMS's from SIM card
   
   Serial.println("Ready for testing...");
   digitalWrite(13, LOW);
 }
 
-void startSMS(char mobile_number[10]) // function to start a text message transmission
-{
+void startSMS(char mobile_number[10]) {
   int quote = 34;
   int cr = 13;
   int nl = 10;
@@ -44,8 +42,7 @@ void startSMS(char mobile_number[10]) // function to start a text message transm
   delay(500); // give the module some thinking time
 }
 
-void endSMS() // function to end a text message transmission
-{
+void endSMS() {
   int endline = 26;
   int cr = 13;
   int nl = 10;
@@ -55,19 +52,14 @@ void endSMS() // function to end a text message transmission
   digitalWrite(13, LOW); // turn off LED when message has been sent
 }
 
-void sendSMS(char mobile_number[], char message[])
-{
+void sendSMS(char mobile_number[], char message[]) {
   startSMS(mobile_number);
   cell.print(message);
   endSMS();
 }
 
-void getSignalStrength(char signal_strength[10])
-{
-  // clear the cell's incoming buffer
-  while (cell.available() > 0) {
-    cell.read();
-  }
+void getSignalStrength(char signal_strength[10]) {
+  clearBuffer();
   
   // query for signal, response should start with CSQ
   cell.println("AT+CSQ");
@@ -96,62 +88,56 @@ void getSignalStrength(char signal_strength[10])
   signal_strength[data_pos] = '\0';
 }
 
-void readSMS(char message[]) {
-
-  /*bool started = false;
-  bool ended = false;
-
-  char inData[200];
-  byte index;
-  
-  cell.println("AT+CMGR=1");
+//This function doesn't reall work, and I'm not sure why
+void listSMS(char message[]) {
+  Serial.println("Printing ALL SMS");
+  cell.println("AT+CMGL=\"ALL\"");
+  message[0] = '\0';
+  char buffer = 0;
+  int data_pos = 0;
   delay(1000);
-  while(cell.available() > 0)
-  {
-    incoming_char = cell.read();
-    cell.println(incoming_char);
-    if(incoming_char == SOP)
-    {
-       index = 0;
-       inData[index] = '\0';
-       started = true;
-       ended = false;
-    }
-    else if(incoming_char == EOP)
-    {
-       ended = true;
-       break;
-    }
-    else
-    {
-      if(index < 200)
-      {
-        inData[index++] = incoming_char;
-        inData[index] = '\0';
+  while(1) {
+    if(cell.available() >0) {
+      incoming_char = cell.read();    //Get the character from the cellular serial port.
+      if (incoming_char == 'O') {
+        buffer = incoming_char;
+        incoming_char = cell.read();
+        if (incoming_char = 'K') {
+          break;
+        }
+        else {
+          message[data_pos++] = buffer;
+          message[data_pos++] = incoming_char;
+          message[data_pos] = '\0';
+        }
+      } else {
+        if (data_pos < 1000) {
+          Serial.print(incoming_char);
+          if (incoming_char = '+') {
+            message[data_pos++] = '\r';
+            message[data_pos++] = '\n';
+            message[data_pos++] = incoming_char;
+            message[data_pos] = '\0';
+          }
+          else {
+            message[data_pos++] = incoming_char;  //Print the incoming character to the terminal.
+            message[data_pos] = '\0';
+          }
+        }
+        else {
+          break;
+        }
       }
     }
   }
+}
 
-  // We are here either because all pending serial
-  // data has been read OR because an end of
-  // packet marker arrived. Which is it?
-  if(started && ended)
-  {
-    // The end of packet marker arrived. Process the packet
-
-    // Reset for the next packet
-    started = false;
-    ended = false;
-    index = 0;
-    message = inData;
-    inData[index] = '\0';
-  }*/
+void readSMS(char message[]) {
   cell.println("AT+CMGR=1");
   char data_pos = 0;
   message[0] = '\0';
   while(1) {
-    if(cell.available() >0)
-    {
+    if(cell.available() >0) {
       incoming_char = cell.read();    //Get the character from the cellular serial port.
       if (incoming_char == '\r') {
         incoming_char = cell.read();
@@ -174,8 +160,13 @@ void readSMS(char message[]) {
   }
 }
 
-void loop()
-{
+void clearBuffer() {
+  while (cell.available() > 0) {
+    cell.read();
+  }
+}
+
+void loop() {
   int RED = digitalRead(10);
   int BLUE = digitalRead(11);
   int WHITE = digitalRead(12);
@@ -187,11 +178,17 @@ void loop()
     //Serial.println("RED was pressed...Sending txt...");
     //sendSMS("2037676789", "RED was pressed!");
     Serial.println("Red pressed");
+    Serial.println("Lets try to get the time from Google");
     char message[200];
+    //char all_sms[1000];
     digitalWrite(13, HIGH);
+    //listSMS(all_sms);
+    sendSMS("466453", "time denver");
+    clearBuffer();
     readSMS(message);
     digitalWrite(13, LOW);
     Serial.println(message);
+    //Serial.println(all_sms);
   } 
  
   if(BLUE == HIGH) {
