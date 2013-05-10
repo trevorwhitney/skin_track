@@ -25,7 +25,7 @@ void loop() {
     counter += 1;
   }
   else if (counter < 5 && !awake) {
-    //If radio is asleep and counter is less than 5, 
+    //If radio is asleep and counter is less than 5,
     //sleep another second
     Serial.print("Asleep for ");
     Serial.print(counter);
