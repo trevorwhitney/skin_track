@@ -33,6 +33,8 @@ int beacon_status = 0;
 int process_beacon = 0;
 int enter_gate_timer = 0; // 10 = 1 second @ delay of 100
 int exit_gate_timer = 0;
+int ir_a_timer = 0;
+int ir_b_timer = 0;
 int record_count = 0;
 
 int state = 0;
@@ -104,12 +106,14 @@ void loop() {
     //1st priority 2nd gate gets triggerd
     //2nd priority 1st gate is still triggered, reset timer
     //3rd priority neither gate triggered, increment timer
+
     readIRSensors();
     logState("State 1: Gate A Triggered (Enter)...");
+
     char status[256];
-    sprintf(status, "Enter gate status: %d, Enter gate timer: %d, Process enter %d, Process exit %d",
+    sprintf(status, "Enter status: %d, enter timer: %d, process enter: %d, process exit: %d",
       enter_gate_status, enter_gate_timer, process_enter, process_exit);
-    //printMsg(status);
+    printMsg(status);
 
     if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset
@@ -144,12 +148,6 @@ void loop() {
       return;
     }
 
-    if (process_exit == 0 && enter_gate_status == 1) {
-      //printMsg("Resetting timer...");
-      enter_gate_timer = 0;
-      return;
-    }
-
     if (process_exit == 1) {
       enter_gate_timer = 0;
       process_beacon = 0;
@@ -158,11 +156,15 @@ void loop() {
       return;
     }
 
-    enter_gate_timer += 1;
-    char elapsed_timer[128];
-    sprintf(elapsed_timer, "Incrementing timer to %d\0", enter_gate_timer);
-    printMsg(elapsed_timer);
-    return;
+    if (enter_gate_status == 1) {
+      enter_gate_timer = 0;
+      return;
+    }
+
+    if (process_exit == 0) {
+      enter_gate_timer += 1;
+      return;
+    }
   }
 
   //Channel B was triggered first, so this is an "exit"
@@ -170,7 +172,8 @@ void loop() {
   //beacon present, go to state 8 to record unkown direction
   if (state == 2) {
     //exit was triggered first, check for enter
-    readEnterSensor();
+    //readEnterSensor();
+    readIRSensors();
     logState("State 2: Gate B triggered (Exit)...");
 
     if (exit_gate_timer > GATE_TIMER) {
@@ -179,7 +182,7 @@ void loop() {
       exit_gate_timer = 0;
       process_exit = 0;
 
-            //if a beacon was captured when the gate was first triggered,
+      //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
       //so record an unknown direction with beacon
       if (process_beacon == 1) {
@@ -207,11 +210,6 @@ void loop() {
       return;
     }
 
-    if (process_enter == 0) {
-      exit_gate_timer += 1;
-      return;
-    }
-
     if (process_enter == 1) {
       exit_gate_timer = 0;
       process_beacon = 0;
@@ -219,6 +217,17 @@ void loop() {
       print_state = 1;
       return;
     }
+
+    if (exit_gate_status == 1) {
+      exit_gate_timer = 0;
+      return;
+    }
+
+    if (process_enter == 0) {
+      exit_gate_timer += 1;
+      return;
+    }
+
   }
 
   //IR sensors triggered in the order A->B, so enter->exit
@@ -360,30 +369,18 @@ void readEnterSensor() {
   //printMsg(ir_a_status);
 
   if (IR_A == LOW && enter_gate_status == 0) {
-    printMsg("LOW and 0 triggered");
     if (process_enter == 0) {
       enter_gate_status = 1;
       process_enter = 1;
     }
-    return;
   }
-
-  if (IR_A == HIGH && enter_gate_status == 1 && enter_gate_timer > IR_RESET_TIMER) {
-    printMsg("Enter IR reset");
+  else if (IR_A == HIGH && enter_gate_status == 1 &&
+      ir_a_timer > IR_RESET_TIMER) {
     enter_gate_status = 0;
-    enter_gate_timer = 0;
-    return;
+    ir_a_timer = 0;
   }
-
-  if (IR_A == HIGH && enter_gate_status == 1) {
-    printMsg("Enter IR timer increment");
-    char before[128];
-    sprintf(before, "Before increment: %d\0", enter_gate_timer);
-    enter_gate_timer = enter_gate_timer + 1;
-    char elapsed_enter_time[128];
-    sprintf(elapsed_enter_time, "Enter timer %d\0", enter_gate_timer);
-    printMsg(elapsed_enter_time);
-    return;
+  else if (IR_A == HIGH && enter_gate_status == 1) {
+    ir_a_timer += 1;
   }
 }
 
@@ -396,12 +393,13 @@ void readExitSensor() {
       process_exit = 1;
     }
   }
-  else if (IR_B == HIGH && exit_gate_status == 1 && exit_gate_timer > IR_RESET_TIMER) {
+  else if (IR_B == HIGH && exit_gate_status == 1 &&
+      ir_b_timer > IR_RESET_TIMER) {
     exit_gate_status = 0;
-    exit_gate_timer = 0;
+    ir_b_timer = 0;
   }
   else if (IR_B == HIGH && exit_gate_status == 1) {
-    exit_gate_timer += 1;
+    ir_b_timer += 1;
   }
 }
 
