@@ -48,7 +48,7 @@ const uint8_t spiSpeed = SPI_HALF_SPEED;
 SdFat sd;
 SdFile file;
 int chipSelect = 8;
-int cardInitialized = 1;
+boolean cardInitialized = true;
 
 //Variables for our SD output
 char name[] = "access_record.csv";
@@ -80,7 +80,7 @@ void setup() {
 
   if (!sd.begin(chipSelect, SPI_HALF_SPEED)) {
     printMsg("Unable to initialize SD card, data will not be saved.");
-    cardInitialized = 0;
+    cardInitialized = false;
   }
 
   //initialize XBee
@@ -92,7 +92,6 @@ void setup() {
 
 void loop() {
   delay(100);
-  //xbee.print("\r\nHello from XBee!");
 
   if (state == 0) {
     //check which one gets triggered first
@@ -101,22 +100,18 @@ void loop() {
   }
 
   // Channel A was triggered first, so this is an "enter"
-  //FIXME: Add a beacon check, if at the end of the timer there is a
-  //beacon present, go to state 8 to record unkown direction
   if (state == 1) {
     //enter was triggered first, check for exit
     readIRSensors();
     logState("State 1: Gate A Triggered (Enter)...");
 
-    char status[256];
-    sprintf(status, "Enter status: %d, enter timer: %d, process_enter: %d, process_exit: %d\0",
-      enter_gate_status, enter_gate_timer, process_enter, process_exit);
-    //printMsg(status);
+    // char status[256];
+    // sprintf(status, "Enter status: %d, enter timer: %d, process_enter: %d, process_exit: %d\0",
+    //   enter_gate_status, enter_gate_timer, process_enter, process_exit);
+    // printMsg(status);
 
     if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
-      //FIXME: check for beacon before reset, if beacon
-      //go to state 8
       enter_gate_timer = 0;
       process_enter = 0;
 
@@ -130,25 +125,25 @@ void loop() {
       //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
       //so record an unknown direction with beacon
-      if (process_beacon == 1) {
-        state = 8;
-        print_state = 1;
-        return;
-      }
+      // if (process_beacon == 1) {
+      //   state = 8;
+      //   print_state = 1;
+      //   return;
+      // }
 
       //if a beacon was not captured when the gate was first triggered,
       //they may have turned it on while in the gate, and they spent too
       //much time in the gate, or only triggered one IR on their exit
       //so get the current status of the BCA and record it
-      if (process_beacon == 0) {
-        readBeacon();
-        if (beacon_status == 1) {
-          process_beacon = 1;
-          state = 8;
-          print_state = 1;
-          return;
-        }
-      }
+      // if (process_beacon == 0) {
+      //   readBeacon();
+      //   if (beacon_status == 1) {
+      //     process_beacon = 1;
+      //     state = 8;
+      //     print_state = 1;
+      //     return;
+      //   }
+      // }
 
       state = 0;
       print_state = 1;
@@ -198,25 +193,25 @@ void loop() {
       //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
       //so record an unknown direction with beacon
-      if (process_beacon == 1) {
-        state = 8;
-        print_state = 1;
-        return;
-      }
+      // if (process_beacon == 1) {
+      //   state = 8;
+      //   print_state = 1;
+      //   return;
+      // }
 
       //if a beacon was not captured when the gate was first triggered,
       //they may have turned it on while in the gate, and they spent too
       //much time in the gate, or only triggered one IR on their exit
       //so get the current status of the BCA and record it
-      if (process_beacon == 0) {
-        readBeacon();
-        if (beacon_status == 1) {
-          process_beacon = 1;
-          state = 8;
-          print_state = 1;
-          return;
-        }
-      }
+      // if (process_beacon == 0) {
+      //   readBeacon();
+      //   if (beacon_status == 1) {
+      //     process_beacon = 1;
+      //     state = 8;
+      //     print_state = 1;
+      //     return;
+      //   }
+      // }
 
       state = 0;
       print_state = 1;
@@ -316,13 +311,14 @@ void loop() {
   //record
   if (state == 8) {
     logState("State 8: BC direction unknown, checking beacon...");
-    if (process_beacon == 1) {
-      beacon_status = 1;
-      process_beacon = 0;
-    }
-    else {
-      readBeacon();
-    }
+    // if (process_beacon == 1) {
+    //   beacon_status = 1;
+    //   process_beacon = 0;
+    // }
+    // else {
+    //   readBeacon();
+    // }
+    readBeacon();
 
     SkinTrackRecord record;
     record.beacon = beacon_status;
@@ -426,20 +422,20 @@ boolean checkGate() {
 
   if (process_enter == 1 && process_exit == 0) {
     state = 1;
-    readBeacon();
-    if (beacon_status == 1) {
-      process_beacon = 1;
-    }
+    // readBeacon();
+    // if (beacon_status == 1) {
+    //   process_beacon = 1;
+    // }
     print_state = 1;
     return true;
   }
 
   if (process_exit == 1 && process_enter == 0) {
     state = 2;
-    readBeacon();
-    if (beacon_status == 1) {
-      process_beacon = 1;
-    }
+    // readBeacon();
+    // if (beacon_status == 1) {
+    //   process_beacon = 1;
+    // }
     print_state = 1;
     return true;
   }
@@ -522,10 +518,10 @@ void readBeacon() {
 
 void saveToSD(SkinTrackRecord record) {
   if (!cardInitialized) {
+    printMsg("Card not initialized");
     return;
   }
 
-  //Open or create the file 'name' in 'root' for writing to the end of the file.
   if (!file.open("data.csv", O_RDWR | O_CREAT | O_AT_END)) {
     printMsg("Unable to open file on SD card for writing.");
     return;
