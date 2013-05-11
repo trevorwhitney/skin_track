@@ -107,6 +107,11 @@ void loop() {
     readIRSensors();
     logState("State 1: Gate A Triggered (Enter)...");
 
+    char status[256];
+    sprintf(status, "Enter status: %d, enter timer: %d, process_enter: %d, process_exit: %d\0",
+      enter_gate_status, enter_gate_timer, process_enter, process_exit);
+    printMsg(status);
+
     if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
       //FIXME: check for beacon before reset, if beacon
@@ -412,6 +417,9 @@ void readEnterSensor() {
   else if (IR_A == HIGH && enter_gate_status == 1) {
     ir_a_timer += 1;
   }
+  else {
+    ir_a_timer = 0;
+  }
 }
 
 void readExitSensor() {
@@ -430,6 +438,9 @@ void readExitSensor() {
   }
   else if (IR_B == HIGH && exit_gate_status == 1) {
     ir_b_timer += 1;
+  }
+  else {
+    ir_b_timer = 0;
   }
 }
 
