@@ -11,7 +11,7 @@
 
 //delay @ 100, 10 = 1 sec, 100 = 10 sec
 #define GATE_TIMER 30
-#define IR_RESET_TIMER 20
+#define IR_RESET_TIMER 10
 
 void setup();
 void loop();
@@ -70,10 +70,10 @@ void setup() {
   //XBee
   pinMode(XBEE_SLEEP_PIN, OUTPUT);
 
-  if (!sd.begin(chipSelect, SPI_HALF_SPEED)) {
-    printMsg("Unable to initialize SD card, data will not be saved.");
-    cardInitialized = 0;
-  }
+  // if (!sd.begin(chipSelect, SPI_HALF_SPEED)) {
+  //   printMsg("Unable to initialize SD card, data will not be saved.");
+  //   cardInitialized = 0;
+  // }
 
   //initialize XBee
   xbee.begin(57600);
@@ -104,8 +104,12 @@ void loop() {
     //1st priority 2nd gate gets triggerd
     //2nd priority 1st gate is still triggered, reset timer
     //3rd priority neither gate triggered, increment timer
-    readExitSensor();
+    readIRSensors();
     logState("State 1: Gate A Triggered (Enter)...");
+    char status[256];
+    sprintf(status, "Enter gate status: %d, Enter gate timer: %d, Process enter %d, Process exit %d",
+      enter_gate_status, enter_gate_timer, process_enter, process_exit);
+    //printMsg(status);
 
     if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset
@@ -140,8 +144,9 @@ void loop() {
       return;
     }
 
-    if (process_exit == 0) {
-      enter_gate_timer += 1;
+    if (process_exit == 0 && enter_gate_status == 1) {
+      //printMsg("Resetting timer...");
+      enter_gate_timer = 0;
       return;
     }
 
@@ -152,6 +157,12 @@ void loop() {
       state = 3;
       return;
     }
+
+    enter_gate_timer += 1;
+    char elapsed_timer[128];
+    sprintf(elapsed_timer, "Incrementing timer to %d\0", enter_gate_timer);
+    printMsg(elapsed_timer);
+    return;
   }
 
   //Channel B was triggered first, so this is an "exit"
@@ -343,20 +354,36 @@ void readIRSensors() {
 void readEnterSensor() {
   int IR_A = digitalRead(7);
 
+  char ir_a_status[256];
+  sprintf(ir_a_status, "IR_A %d, Gate status %d, Gate timer %d",
+    IR_A, enter_gate_status, enter_gate_timer);
+  //printMsg(ir_a_status);
+
   if (IR_A == LOW && enter_gate_status == 0) {
-    //Serial.println("A is low");
+    printMsg("LOW and 0 triggered");
     if (process_enter == 0) {
       enter_gate_status = 1;
       process_enter = 1;
     }
+    return;
   }
-  else if (IR_A == HIGH && enter_gate_status == 1 &&
-      enter_gate_timer > IR_RESET_TIMER) {
+
+  if (IR_A == HIGH && enter_gate_status == 1 && enter_gate_timer > IR_RESET_TIMER) {
+    printMsg("Enter IR reset");
     enter_gate_status = 0;
     enter_gate_timer = 0;
+    return;
   }
-  else if (IR_A == HIGH && enter_gate_status == 1) {
-    enter_gate_timer += 1;
+
+  if (IR_A == HIGH && enter_gate_status == 1) {
+    printMsg("Enter IR timer increment");
+    char before[128];
+    sprintf(before, "Before increment: %d\0", enter_gate_timer);
+    enter_gate_timer = enter_gate_timer + 1;
+    char elapsed_enter_time[128];
+    sprintf(elapsed_enter_time, "Enter timer %d\0", enter_gate_timer);
+    printMsg(elapsed_enter_time);
+    return;
   }
 }
 
@@ -369,8 +396,7 @@ void readExitSensor() {
       process_exit = 1;
     }
   }
-  else if (IR_B == HIGH && exit_gate_status == 1 &&
-      exit_gate_timer > IR_RESET_TIMER) {
+  else if (IR_B == HIGH && exit_gate_status == 1 && exit_gate_timer > IR_RESET_TIMER) {
     exit_gate_status = 0;
     exit_gate_timer = 0;
   }
