@@ -10,6 +10,20 @@
 #define GATE_UNKNOWN -1
 #define XBEE_SLEEP_PIN 9
 
+#define GATE_TIMER 30
+#define IR_RESET_TIMER 10
+
+void setup();
+void loop();
+boolean checkGate();
+void readIRSensors();
+void readEnterSensor();
+void readBeacon();
+void saveToSD(SkinTrackRecord);
+void logState(char*);
+void printMsg(char*);
+void sendRecord(SkinTrackRecord);
+
 int enter_gate_status = 0; // 0 is off, 1 is triggered
 int exit_gate_status = 0; // 0 is off, 1 is triggered
 int process_enter = 0;
@@ -18,6 +32,10 @@ int beacon_status = 0;
 int enter_gate_timer = 0; // 10 = 1 second @ delay of 100
 int exit_gate_timer = 0;
 int radio_timer = 0;
+
+//for ir timing
+int ir_a_timer = 0;
+int ir_b_timer = 0;
 
 int state = 0;
 int print_state = 1;
@@ -47,17 +65,6 @@ SoftwareSerial xbee(2,3);
 
 //FIXME: case of beacon and no IR?
 //need a timer so this isn't preemptively triggered
-void setup();
-void loop();
-boolean checkGate();
-void readIRSensors();
-void readEnterSensor();
-void readBeacon();
-void saveToSD(SkinTrackRecord);
-void logState(char*);
-void printMsg(char*);
-void sendRecord(SkinTrackRecord);
-
 
 void setup() {
   //Sensors
@@ -97,29 +104,25 @@ void loop() {
   //beacon present, go to state 8 to record unkown direction
   if (state == 1) {
     //enter was triggered first, check for exit
-    readExitSensor();
+    readIRSensors();
     logState("State 1: Gate A Triggered (Enter)...");
 
-    if (enter_gate_timer > 10) {
+    if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
       //FIXME: check for beacon before reset, if beacon
       //go to state 8
       enter_gate_timer = 0;
       process_enter = 0;
 
-      if (recordQueue.count() > 0) {
-        state = 9;
-      }
-      else {
-        state = 0;
-      }
+      // if (recordQueue.count() > 0) {
+      //   state = 9;
+      // }
+      // else {
+      //   state = 0;
+      // }
+      state = 0;
 
       print_state = 1;
-      return;
-    }
-
-    if (process_exit == 0) {
-      enter_gate_timer += 1;
       return;
     }
 
@@ -129,6 +132,16 @@ void loop() {
       state = 3;
       return;
     }
+
+    if (enter_gate_status == 1) {
+      enter_gate_timer = 0;
+      return;
+    }
+
+    if (process_exit == 0) {
+      enter_gate_timer += 1;
+      return;
+    }
   }
 
   //Channel B was triggered first, so this is an "exit"
@@ -136,29 +149,25 @@ void loop() {
   //beacon present, go to state 8 to record unkown direction
   if (state == 2) {
     //exit was triggered first, check for enter
-    readEnterSensor();
+    readIRSensors();
     logState("State 2: Gate B triggered (Exit)...");
 
-    if (exit_gate_timer > 10) {
+    if (exit_gate_timer > GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
       //FIXME: check for beacon before resetting, if beacon
       //go to state 8
       exit_gate_timer = 0;
       process_exit = 0;
 
-      if (recordQueue.count() > 0) {
-        state = 9;
-      }
-      else {
-        state = 0;
-      }
+      // if (recordQueue.count() > 0) {
+      //   state = 9;
+      // }
+      // else {
+      //   state = 0;
+      // }
+      state = 0;
 
       print_state = 1;
-      return;
-    }
-
-    if (process_enter == 0) {
-      exit_gate_timer += 1;
       return;
     }
 
@@ -166,6 +175,16 @@ void loop() {
       exit_gate_timer = 0;
       state = 4;
       print_state = 1;
+      return;
+    }
+
+    if (exit_gate_status == 1) {
+      exit_gate_timer = 0;
+      return;
+    }
+
+    if (process_enter == 0) {
+      exit_gate_timer += 1;
       return;
     }
   }
@@ -219,7 +238,7 @@ void loop() {
     record.direction = GATE_ENTER;
     saveToSD(record); //Save to SD
     recordQueue.push(record); //add to radio queue
-    state = 9;
+    state = 0;
     print_state = 1;
     return;
   }
@@ -234,7 +253,7 @@ void loop() {
     record.direction = GATE_EXIT;
     saveToSD(record); //Save to SD
     recordQueue.push(record); //add to radio queue
-    state = 9;
+    state = 0;
     print_state = 1;
     return;
 
@@ -251,7 +270,7 @@ void loop() {
     record.direction = GATE_UNKNOWN;
     saveToSD(record); //Save to SD
     recordQueue.push(record); //add to radio queue
-    state = 9;
+    state = 0;
     print_state = 1;
     return;
 
@@ -380,23 +399,18 @@ void readEnterSensor() {
   int IR_A = digitalRead(7);
 
   if (IR_A == LOW && enter_gate_status == 0) {
-    //Serial.println("A is low");
     if (process_enter == 0) {
       enter_gate_status = 1;
       process_enter = 1;
     }
   }
-  else if (IR_A == HIGH && enter_gate_status == 1 && enter_gate_timer > 10) {
-    //Serial.println("Resetting A");
+  else if (IR_A == HIGH && enter_gate_status == 1 &&
+      ir_a_timer > IR_RESET_TIMER) {
     enter_gate_status = 0;
-    enter_gate_timer = 0;
-    //a_trigger_count += 1;
+    ir_a_timer = 0;
   }
   else if (IR_A == HIGH && enter_gate_status == 1) {
-    //Serial.println("A dipped low");
-    //Serial.print("Timer: ");
-    //Serial.println(enter_gate_timer);
-    enter_gate_timer += 1;
+    ir_a_timer += 1;
   }
 }
 
@@ -404,20 +418,18 @@ void readExitSensor() {
   int IR_B = digitalRead(6);
 
   if (IR_B == LOW && exit_gate_status == 0) {
-    //Serial.println("B is low");
     if (process_exit == 0) {
       exit_gate_status = 1;
       process_exit = 1;
     }
   }
-  else if (IR_B == HIGH && exit_gate_status == 1 && exit_gate_timer > 10) {
-    //Serial.println("Resetting B");
+  else if (IR_B == HIGH && exit_gate_status == 1 &&
+      ir_b_timer > IR_RESET_TIMER) {
     exit_gate_status = 0;
-    exit_gate_timer = 0;
-    //b_trigger_count += 1;
+    ir_b_timer = 0;
   }
   else if (IR_B == HIGH && exit_gate_status == 1) {
-    exit_gate_timer += 1;
+    ir_b_timer += 1;
   }
 }
 
@@ -453,28 +465,14 @@ void saveToSD(SkinTrackRecord record) {
   file.print(contents);
   file.close();
 
-  //Test that it wrote correctly
-  // if (!file.open("data.csv", O_READ)) {
-  //   Serial.println("Unable to open file on SD card for reading.");
-  //   return;
-  // }
-
-  //read from the file
-  // in_char = file.read();
-  // Serial.println("Reading file...");
-  // while(in_char >=0) {
-  //   Serial.write(in_char);
-  //   in_char=file.read();
-  // }
-  // file.close();
 }
 
 void logState(char *msg) {
   if (print_state) {
     //Serial.println(msg);
     if (xbee_awake) {
-      xbee.print("\r\n");
       xbee.print(msg);
+      xbee.print("\r\n");
     }
     print_state = 0;
   }
@@ -483,8 +481,8 @@ void logState(char *msg) {
 void printMsg(char *msg) {
   //Serial.println(msg);
   if (xbee_awake) {
-    xbee.print("\r\n");
     xbee.print(msg);
+    xbee.print("\r\n");
   }
 }
 
