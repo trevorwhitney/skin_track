@@ -29,6 +29,7 @@ int exit_gate_status = 0; // 0 is off, 1 is triggered
 int process_enter = 0;
 int process_exit = 0;
 int beacon_status = 0;
+int process_beacon = 0;
 int enter_gate_timer = 0; // 10 = 1 second @ delay of 100
 int exit_gate_timer = 0;
 int radio_timer = 0;
@@ -110,7 +111,7 @@ void loop() {
     char status[256];
     sprintf(status, "Enter status: %d, enter timer: %d, process_enter: %d, process_exit: %d\0",
       enter_gate_status, enter_gate_timer, process_enter, process_exit);
-    printMsg(status);
+    //printMsg(status);
 
     if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
@@ -125,14 +126,38 @@ void loop() {
       // else {
       //   state = 0;
       // }
-      state = 0;
 
+      //if a beacon was captured when the gate was first triggered,
+      //they may have never triggered the other gate
+      //so record an unknown direction with beacon
+      if (process_beacon == 1) {
+        state = 8;
+        print_state = 1;
+        return;
+      }
+
+      //if a beacon was not captured when the gate was first triggered,
+      //they may have turned it on while in the gate, and they spent too
+      //much time in the gate, or only triggered one IR on their exit
+      //so get the current status of the BCA and record it
+      if (process_beacon == 0) {
+        readBeacon();
+        if (beacon_status == 1) {
+          process_beacon = 1;
+          state = 8;
+          print_state = 1;
+          return;
+        }
+      }
+
+      state = 0;
       print_state = 1;
       return;
     }
 
     if (process_exit == 1) {
       enter_gate_timer = 0;
+      process_beacon = 0;
       print_state = 1;
       state = 3;
       return;
@@ -170,14 +195,37 @@ void loop() {
       // else {
       //   state = 0;
       // }
-      state = 0;
+      //if a beacon was captured when the gate was first triggered,
+      //they may have never triggered the other gate
+      //so record an unknown direction with beacon
+      if (process_beacon == 1) {
+        state = 8;
+        print_state = 1;
+        return;
+      }
 
+      //if a beacon was not captured when the gate was first triggered,
+      //they may have turned it on while in the gate, and they spent too
+      //much time in the gate, or only triggered one IR on their exit
+      //so get the current status of the BCA and record it
+      if (process_beacon == 0) {
+        readBeacon();
+        if (beacon_status == 1) {
+          process_beacon = 1;
+          state = 8;
+          print_state = 1;
+          return;
+        }
+      }
+
+      state = 0;
       print_state = 1;
       return;
     }
 
     if (process_enter == 1) {
       exit_gate_timer = 0;
+      process_beacon = 0;
       state = 4;
       print_state = 1;
       return;
@@ -268,7 +316,13 @@ void loop() {
   //record
   if (state == 8) {
     logState("State 8: BC direction unknown, checking beacon...");
-    readBeacon();
+    if (process_beacon == 1) {
+      beacon_status = 1;
+      process_beacon = 0;
+    }
+    else {
+      readBeacon();
+    }
 
     SkinTrackRecord record;
     record.beacon = beacon_status;
@@ -372,12 +426,20 @@ boolean checkGate() {
 
   if (process_enter == 1 && process_exit == 0) {
     state = 1;
+    readBeacon();
+    if (beacon_status == 1) {
+      process_beacon = 1;
+    }
     print_state = 1;
     return true;
   }
 
   if (process_exit == 1 && process_enter == 0) {
     state = 2;
+    readBeacon();
+    if (beacon_status == 1) {
+      process_beacon = 1;
+    }
     print_state = 1;
     return true;
   }
