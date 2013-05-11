@@ -125,25 +125,25 @@ void loop() {
       //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
       //so record an unknown direction with beacon
-      // if (process_beacon == 1) {
-      //   state = 8;
-      //   print_state = 1;
-      //   return;
-      // }
+      if (process_beacon == 1) {
+        state = 8;
+        print_state = 1;
+        return;
+      }
 
       //if a beacon was not captured when the gate was first triggered,
       //they may have turned it on while in the gate, and they spent too
       //much time in the gate, or only triggered one IR on their exit
       //so get the current status of the BCA and record it
-      // if (process_beacon == 0) {
-      //   readBeacon();
-      //   if (beacon_status == 1) {
-      //     process_beacon = 1;
-      //     state = 8;
-      //     print_state = 1;
-      //     return;
-      //   }
-      // }
+      if (process_beacon == 0) {
+        readBeacon();
+        if (beacon_status == 1) {
+          process_beacon = 1;
+          state = 8;
+          print_state = 1;
+          return;
+        }
+      }
 
       state = 0;
       print_state = 1;
@@ -193,25 +193,25 @@ void loop() {
       //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
       //so record an unknown direction with beacon
-      // if (process_beacon == 1) {
-      //   state = 8;
-      //   print_state = 1;
-      //   return;
-      // }
+      if (process_beacon == 1) {
+        state = 8;
+        print_state = 1;
+        return;
+      }
 
       //if a beacon was not captured when the gate was first triggered,
       //they may have turned it on while in the gate, and they spent too
       //much time in the gate, or only triggered one IR on their exit
       //so get the current status of the BCA and record it
-      // if (process_beacon == 0) {
-      //   readBeacon();
-      //   if (beacon_status == 1) {
-      //     process_beacon = 1;
-      //     state = 8;
-      //     print_state = 1;
-      //     return;
-      //   }
-      // }
+      if (process_beacon == 0) {
+        readBeacon();
+        if (beacon_status == 1) {
+          process_beacon = 1;
+          state = 8;
+          print_state = 1;
+          return;
+        }
+      }
 
       state = 0;
       print_state = 1;
@@ -311,14 +311,13 @@ void loop() {
   //record
   if (state == 8) {
     logState("State 8: BC direction unknown, checking beacon...");
-    // if (process_beacon == 1) {
-    //   beacon_status = 1;
-    //   process_beacon = 0;
-    // }
-    // else {
-    //   readBeacon();
-    // }
-    readBeacon();
+    if (process_beacon == 1) {
+      beacon_status = 1;
+      process_beacon = 0;
+    }
+    else {
+      readBeacon();
+    }
 
     SkinTrackRecord record;
     record.beacon = beacon_status;
@@ -422,20 +421,20 @@ boolean checkGate() {
 
   if (process_enter == 1 && process_exit == 0) {
     state = 1;
-    // readBeacon();
-    // if (beacon_status == 1) {
-    //   process_beacon = 1;
-    // }
+    readBeacon();
+    if (beacon_status == 1) {
+      process_beacon = 1;
+    }
     print_state = 1;
     return true;
   }
 
   if (process_exit == 1 && process_enter == 0) {
     state = 2;
-    // readBeacon();
-    // if (beacon_status == 1) {
-    //   process_beacon = 1;
-    // }
+    readBeacon();
+    if (beacon_status == 1) {
+      process_beacon = 1;
+    }
     print_state = 1;
     return true;
   }
