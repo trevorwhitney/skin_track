@@ -24,6 +24,8 @@ void logState(char*);
 void printMsg(char*);
 void sendRecord(SkinTrackRecord);
 void processRecord(SkinTrackRecord);
+void sleepXBee();
+void wakeXBee();
 
 int enter_gate_status = 0; // 0 is off, 1 is triggered
 int exit_gate_status = 0; // 0 is off, 1 is triggered
@@ -42,8 +44,6 @@ int ir_b_timer = 0;
 int state = 0;
 int print_state = 1;
 
-QueueArray<SkinTrackRecord> recordQueue;
-
 //Variables needed to initialize SD card
 const uint8_t spiSpeed = SPI_HALF_SPEED;
 SdFat sd;
@@ -60,13 +60,6 @@ int index=0;
 //variables for XBee
 boolean xbee_awake = true;
 SoftwareSerial xbee(2,3);
-
-//TODO
-//FIXME: If a beacon is detected it should override the
-//IR sensors, and record a finding
-
-//FIXME: case of beacon and no IR?
-//need a timer so this isn't preemptively triggered
 
 void setup() {
   //Sensors
@@ -86,7 +79,9 @@ void setup() {
 
   //initialize XBee
   xbee.begin(57600);
-  digitalWrite(XBEE_SLEEP_PIN, LOW);
+  wakeXBee();
+  printMsg("XBee initialized");
+  sleepXBee();
 
   printMsg("Starting up...");
 }
@@ -97,7 +92,9 @@ void loop() {
   if (state == 0) {
     //check which one gets triggered first
     logState("Entering starting state...");
-    checkGate();
+    if (checkGate()) {
+      wakeXBee();
+    }
   }
 
   // Channel A was triggered first, so this is an "enter"
@@ -330,88 +327,88 @@ void loop() {
 
   //Timer state, recording saved and in queue, wait for timeout until
   //starting the radio up so as not to miss people in groups
-  if (state == 9) {
-    logState("State 9: Records present, starting radio timer");
+  // if (state == 9) {
+  //   logState("State 9: Records present, starting radio timer");
 
-    if (!checkGate()) {
-      // timer waits for a minute before radio communication
-      if (radio_timer >= 100) {
-        radio_timer = 0;
-        state = 10;
-        print_state = 1;
-        return;
-      }
-      if (radio_timer < 600) {
-        radio_timer += 1;
-        return;
-      }
-    }
-    else {
-      radio_timer = 0;
-    }
-  }
+  //   if (!checkGate()) {
+  //     // timer waits for a minute before radio communication
+  //     if (radio_timer >= 100) {
+  //       radio_timer = 0;
+  //       state = 10;
+  //       print_state = 1;
+  //       return;
+  //     }
+  //     if (radio_timer < 600) {
+  //       radio_timer += 1;
+  //       return;
+  //     }
+  //   }
+  //   else {
+  //     radio_timer = 0;
+  //   }
+  // }
 
-  //Begin radio transmission process by turning the radio on
-  if (state == 10) {
-    logState("State 10: Beginning radio transmission process..");
+  // //Begin radio transmission process by turning the radio on
+  // if (state == 10) {
+  //   logState("State 10: Beginning radio transmission process..");
 
-    if (xbee_awake) {
-      //already awake, continue with transmission
-      xbee.print("\r\nIm already awake!");
-    }
-    else {
-      //wake it up
-      digitalWrite(XBEE_SLEEP_PIN, LOW);
-      xbee_awake = true;
-      xbee.print("\r\nGood morning!");
-    }
+  //   if (xbee_awake) {
+  //     //already awake, continue with transmission
+  //     xbee.print("\r\nIm already awake!");
+  //   }
+  //   else {
+  //     //wake it up
+  //     digitalWrite(XBEE_SLEEP_PIN, LOW);
+  //     xbee_awake = true;
+  //     xbee.print("\r\nGood morning!");
+  //   }
 
-    state = 11;
-    print_state = 1;
-    return;
-  }
+  //   state = 11;
+  //   print_state = 1;
+  //   return;
+  // }
 
-  //radio is awake, check to make sure there is something to be sent
-  //or that the sensor hasn't been triggered
-  if (state == 11) {
-    logState("State 11: Checking if there's anything to send...");
+  // //radio is awake, check to make sure there is something to be sent
+  // //or that the sensor hasn't been triggered
+  // if (state == 11) {
+  //   logState("State 11: Checking if there's anything to send...");
 
-    if (!checkGate()) {
-      if (!recordQueue.isEmpty()) {
-        state = 12;
-        print_state = 1;
-        return;
-      }
+  //   if (!checkGate()) {
+  //     if (!recordQueue.isEmpty()) {
+  //       state = 12;
+  //       print_state = 1;
+  //       return;
+  //     }
 
-      //no records in queue, turn radio off and head back to start
-      state = 13;
-      print_state = 1;
-      return;
-    }
-  }
+  //     //no records in queue, turn radio off and head back to start
+  //     state = 13;
+  //     print_state = 1;
+  //     return;
+  //   }
+  // }
 
-  //records in accessQueue, send the first one, return to 11
-  if (state == 12) {
-    logState("State 12: Sending the first record in the queue...");
-    sendRecord(recordQueue.pop());
+  // //records in accessQueue, send the first one, return to 11
+  // if (state == 12) {
+  //   logState("State 12: Sending the first record in the queue...");
+  //   sendRecord(recordQueue.pop());
 
-    state = 11;
-    print_state = 1;
-    return;
-  }
+  //   state = 11;
+  //   print_state = 1;
+  //   return;
+  // }
 
-  //no records in queue, turn the radio off, and return to start state
-  if (state == 13) {
-    //temporarily disable sleeping for debugging purposes
-    if (xbee_awake && false) {
-      digitalWrite(XBEE_SLEEP_PIN, LOW);
-      xbee_awake = false;
-    }
+  // //no records in queue, turn the radio off, and return to start state
+  // if (state == 13) {
+  //   //temporarily disable sleeping for debugging purposes
+  //   if (xbee_awake && false) {
+  //     digitalWrite(XBEE_SLEEP_PIN, LOW);
+  //     xbee_awake = false;
+  //   }
 
-    state = 0;
-    print_state = 1;
-    return;
-  }
+  //   state = 0;
+  //   print_state = 1;
+  //   return;
+  // }
 }
 
 boolean checkGate() {
@@ -554,12 +551,27 @@ void printMsg(char *msg) {
 }
 
 void sendRecord(SkinTrackRecord record) {
+  xbee.print("Clearing buffer");
+  xbee.print("\r\n");
   sprintf(contents, "%d, %d", record.direction, record.beacon);
-  xbee.print("\r\nRecord: ");
+  xbee.print("Record: ");
   xbee.print(contents);
+  xbee.print("\r\n");
 }
 
 void processRecord(SkinTrackRecord record) {
   saveToSD(record); //Save to SD
   //recordQueue.push(record); //add to radio queue
+  sendRecord(record);
+  sleepXBee();
+}
+
+void wakeXBee() {
+  digitalWrite(XBEE_SLEEP_PIN, LOW);
+  xbee_awake = true;
+}
+
+void sleepXBee() {
+  digitalWrite(XBEE_SLEEP_PIN, HIGH);
+  xbee_awake = false;
 }
