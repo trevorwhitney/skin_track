@@ -21,6 +21,7 @@ void readBeacon();
 void saveToSD(SkinTrackRecord);
 void logState(char*);
 void printMsg(char*);
+void logError(char*);
 void sendRecord(SkinTrackRecord);
 void processRecord(SkinTrackRecord);
 void sleepXBee();
@@ -69,8 +70,6 @@ void setup() {
   //XBee
   pinMode(XBEE_SLEEP_PIN, OUTPUT);
 
-  //Serial.begin(9600);
-
   if (!sd.begin(chipSelect, SPI_HALF_SPEED)) {
     printMsg("Unable to initialize SD card, data will not be saved.");
     cardInitialized = false;
@@ -79,10 +78,10 @@ void setup() {
   //initialize XBee
   xbee.begin(57600);
   wakeXBee();
+  delay(500);
+  printMsg("Starting up...");
   printMsg("XBee initialized");
   sleepXBee();
-
-  printMsg("Starting up...");
 }
 
 void loop() {
@@ -90,7 +89,6 @@ void loop() {
 
   if (state == 0) {
     //check which one gets triggered first
-    logState("Entering starting state...");
     if (checkGate()) {
       wakeXBee();
     }
@@ -100,24 +98,11 @@ void loop() {
   if (state == 1) {
     //enter was triggered first, check for exit
     readIRSensors();
-    logState("State 1: Gate A Triggered (Enter)...");
-
-    // char status[256];
-    // sprintf(status, "Enter status: %d, enter timer: %d, process_enter: %d, process_exit: %d\0",
-    //   enter_gate_status, enter_gate_timer, process_enter, process_exit);
-    // printMsg(status);
 
     if (enter_gate_timer >= GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
       enter_gate_timer = 0;
       process_enter = 0;
-
-      // if (recordQueue.count() > 0) {
-      //   state = 9;
-      // }
-      // else {
-      //   state = 0;
-      // }
 
       //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
@@ -167,12 +152,9 @@ void loop() {
   }
 
   //Channel B was triggered first, so this is an "exit"
-  //FIXME: Add a beacon check, if at the end of the timer there is a
-  //beacon present, go to state 8 to record unkown direction
   if (state == 2) {
     //exit was triggered first, check for enter
     readIRSensors();
-    logState("State 2: Gate B triggered (Exit)...");
 
     if (exit_gate_timer > GATE_TIMER) {
       //timer hit, reset to 9 if items in queue, else to start
@@ -181,12 +163,6 @@ void loop() {
       exit_gate_timer = 0;
       process_exit = 0;
 
-      // if (recordQueue.count() > 0) {
-      //   state = 9;
-      // }
-      // else {
-      //   state = 0;
-      // }
       //if a beacon was captured when the gate was first triggered,
       //they may have never triggered the other gate
       //so record an unknown direction with beacon
@@ -237,7 +213,6 @@ void loop() {
   //IR sensors triggered in the order A->B, so enter->exit
   //This is an entrance into the BC
   if (state == 3) {
-    logState("State 3: BC Enter detected...");
 
     process_enter = 0;
     process_exit = 0;
@@ -251,7 +226,6 @@ void loop() {
   //IR sensors triggered in the order B->A, so exit->enter
   //This is an exit from the BC
   if (state == 4) {
-    logState("State 4: BC exit detected...");
 
     process_enter = 0;
     process_exit = 0;
@@ -264,7 +238,6 @@ void loop() {
 
   //Sensors were triggered at the same time.
   if (state == 5) {
-    logState("State 5: IRs triggered at the same time...");
 
     //Go to state 8, where a beacon is read and an unknown direction
     //is recorded
@@ -275,7 +248,6 @@ void loop() {
 
   //An entrance has occured, read beacon and save record
   if (state == 6) {
-    logState("State 6: BC Enter recorded, checking beacon...");
     readBeacon();
 
     SkinTrackRecord record;
@@ -289,7 +261,6 @@ void loop() {
 
   //An exit has occured, read beacon and save record
   if (state == 7) {
-    logState("State 7: BC Exit recorded, checking beacon...");
     readBeacon();
 
     SkinTrackRecord record;
@@ -299,13 +270,11 @@ void loop() {
     state = 0;
     print_state = 1;
     return;
-
   }
 
   //The sensors were triggered in an unknown order, read beacon and save
   //record
   if (state == 8) {
-    logState("State 8: BC direction unknown, checking beacon...");
     if (process_beacon == 1) {
       beacon_status = 1;
       process_beacon = 0;
@@ -321,93 +290,8 @@ void loop() {
     state = 0;
     print_state = 1;
     return;
-
   }
 
-  //Timer state, recording saved and in queue, wait for timeout until
-  //starting the radio up so as not to miss people in groups
-  // if (state == 9) {
-  //   logState("State 9: Records present, starting radio timer");
-
-  //   if (!checkGate()) {
-  //     // timer waits for a minute before radio communication
-  //     if (radio_timer >= 100) {
-  //       radio_timer = 0;
-  //       state = 10;
-  //       print_state = 1;
-  //       return;
-  //     }
-  //     if (radio_timer < 600) {
-  //       radio_timer += 1;
-  //       return;
-  //     }
-  //   }
-  //   else {
-  //     radio_timer = 0;
-  //   }
-  // }
-
-  // //Begin radio transmission process by turning the radio on
-  // if (state == 10) {
-  //   logState("State 10: Beginning radio transmission process..");
-
-  //   if (xbee_awake) {
-  //     //already awake, continue with transmission
-  //     xbee.print("\r\nIm already awake!");
-  //   }
-  //   else {
-  //     //wake it up
-  //     digitalWrite(XBEE_SLEEP_PIN, LOW);
-  //     xbee_awake = true;
-  //     xbee.print("\r\nGood morning!");
-  //   }
-
-  //   state = 11;
-  //   print_state = 1;
-  //   return;
-  // }
-
-  // //radio is awake, check to make sure there is something to be sent
-  // //or that the sensor hasn't been triggered
-  // if (state == 11) {
-  //   logState("State 11: Checking if there's anything to send...");
-
-  //   if (!checkGate()) {
-  //     if (!recordQueue.isEmpty()) {
-  //       state = 12;
-  //       print_state = 1;
-  //       return;
-  //     }
-
-  //     //no records in queue, turn radio off and head back to start
-  //     state = 13;
-  //     print_state = 1;
-  //     return;
-  //   }
-  // }
-
-  // //records in accessQueue, send the first one, return to 11
-  // if (state == 12) {
-  //   logState("State 12: Sending the first record in the queue...");
-  //   sendRecord(recordQueue.pop());
-
-  //   state = 11;
-  //   print_state = 1;
-  //   return;
-  // }
-
-  // //no records in queue, turn the radio off, and return to start state
-  // if (state == 13) {
-  //   //temporarily disable sleeping for debugging purposes
-  //   if (xbee_awake && false) {
-  //     digitalWrite(XBEE_SLEEP_PIN, LOW);
-  //     xbee_awake = false;
-  //   }
-
-  //   state = 0;
-  //   print_state = 1;
-  //   return;
-  // }
 }
 
 boolean checkGate() {
@@ -511,31 +395,27 @@ void readBeacon() {
 
 void saveToSD(SkinTrackRecord record) {
   if (!cardInitialized) {
-    printMsg("Card not initialized");
+    logError("Error: SD card not initialized");
     return;
   }
 
   if (!file.open("data.csv", O_RDWR | O_CREAT | O_AT_END)) {
-    printMsg("Unable to open file on SD card for writing.");
+    logError("Error: Unable to open file on SD card for writing.");
     return;
   }
   //Copy CSV record into contents array
   sprintf(contents, "%d, %d\n", record.direction, record.beacon);
-  printMsg("Writing contents: ");
-  printMsg(contents);
    //Write the record to the end of the file.
   file.print(contents);
   file.close();
-
-  printMsg("Finished writing to disk...");
 }
 
 void logState(char *msg) {
   if (print_state) {
     //Serial.println(msg);
     if (xbee_awake) {
-      //xbee.print(msg);
-      //xbee.print("\r\n");
+      xbee.print(msg);
+      xbee.print("\r\n");
     }
     print_state = 0;
   }
@@ -544,13 +424,28 @@ void logState(char *msg) {
 void printMsg(char *msg) {
   //Serial.println(msg);
   if (xbee_awake) {
-    //xbee.print(msg);
-    //xbee.print("\r\n");
+    xbee.print(msg);
+    xbee.print("\r\n");
+  }
+}
+
+void logError(char *msg) {
+  if (xbee_awake) {
+    delay(200);
+    printMsg("Clearing buffer...");
+    printMsg(msg);
+  }
+  else {
+    wakeXBee();
+    delay(500);
+    printMsg("Clearing buffer...");
+    printMsg(msg);
+    sleepXBee();
   }
 }
 
 void sendRecord(SkinTrackRecord record) {
-  xbee.print("Clearing buffer");
+  xbee.print("Clearing buffer...");
   xbee.print("\r\n");
   sprintf(contents, "%d, %d", record.direction, record.beacon);
   xbee.print("Record: ");
@@ -559,8 +454,7 @@ void sendRecord(SkinTrackRecord record) {
 }
 
 void processRecord(SkinTrackRecord record) {
-  saveToSD(record); //Save to SD
-  //recordQueue.push(record); //add to radio queue
+  saveToSD(record);
   sendRecord(record);
   sleepXBee();
 }
@@ -568,9 +462,11 @@ void processRecord(SkinTrackRecord record) {
 void wakeXBee() {
   digitalWrite(XBEE_SLEEP_PIN, LOW);
   xbee_awake = true;
+  //printMsg("XBee awake\r\n");
 }
 
 void sleepXBee() {
+  //printMsg("XBee going to sleep\r\n");
   digitalWrite(XBEE_SLEEP_PIN, HIGH);
   xbee_awake = false;
 }
