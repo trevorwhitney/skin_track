@@ -1,4 +1,3 @@
-#include <QueueArray.h>
 #include <SdFat.h>
 #include <SoftwareSerial.h>
 #include <SkinTrackRecord.h>
@@ -535,8 +534,8 @@ void logState(char *msg) {
   if (print_state) {
     //Serial.println(msg);
     if (xbee_awake) {
-      xbee.print(msg);
-      xbee.print("\r\n");
+      //xbee.print(msg);
+      //xbee.print("\r\n");
     }
     print_state = 0;
   }
@@ -545,8 +544,8 @@ void logState(char *msg) {
 void printMsg(char *msg) {
   //Serial.println(msg);
   if (xbee_awake) {
-    xbee.print(msg);
-    xbee.print("\r\n");
+    //xbee.print(msg);
+    //xbee.print("\r\n");
   }
 }
 
