@@ -23,6 +23,7 @@ void saveToSD(SkinTrackRecord);
 void logState(char*);
 void printMsg(char*);
 void sendRecord(SkinTrackRecord);
+void processRecord(SkinTrackRecord);
 
 int enter_gate_status = 0; // 0 is off, 1 is triggered
 int exit_gate_status = 0; // 0 is off, 1 is triggered
@@ -284,8 +285,7 @@ void loop() {
     SkinTrackRecord record;
     record.beacon = beacon_status;
     record.direction = GATE_ENTER;
-    saveToSD(record); //Save to SD
-    recordQueue.push(record); //add to radio queue
+    processRecord(record);
     state = 0;
     print_state = 1;
     return;
@@ -299,8 +299,7 @@ void loop() {
     SkinTrackRecord record;
     record.beacon = beacon_status;
     record.direction = GATE_EXIT;
-    saveToSD(record); //Save to SD
-    recordQueue.push(record); //add to radio queue
+    processRecord(record);
     state = 0;
     print_state = 1;
     return;
@@ -322,8 +321,7 @@ void loop() {
     SkinTrackRecord record;
     record.beacon = beacon_status;
     record.direction = GATE_UNKNOWN;
-    saveToSD(record); //Save to SD
-    recordQueue.push(record); //add to radio queue
+    processRecord(record);
     state = 0;
     print_state = 1;
     return;
@@ -533,6 +531,7 @@ void saveToSD(SkinTrackRecord record) {
   file.print(contents);
   file.close();
 
+  printMsg("Finished writing to disk...");
 }
 
 void logState(char *msg) {
@@ -558,4 +557,9 @@ void sendRecord(SkinTrackRecord record) {
   sprintf(contents, "%d, %d", record.direction, record.beacon);
   xbee.print("\r\nRecord: ");
   xbee.print(contents);
+}
+
+void processRecord(SkinTrackRecord record) {
+  saveToSD(record); //Save to SD
+  //recordQueue.push(record); //add to radio queue
 }
