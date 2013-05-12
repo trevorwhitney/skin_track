@@ -71,7 +71,7 @@ void setup() {
   pinMode(XBEE_SLEEP_PIN, OUTPUT);
 
   if (!sd.begin(chipSelect, SPI_HALF_SPEED)) {
-    printMsg("Unable to initialize SD card, data will not be saved.");
+    logError("Error: Unable to initialize SD card, data will not be saved.");
     cardInitialized = false;
   }
 
